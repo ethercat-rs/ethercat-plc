@@ -1,0 +1,18 @@
+[workspace]
+
+[package]
+name = "ethercat-testplc"
+version = "0.1.3"
+authors = ["Georg Brandl <g.brandl@fz-juelich.de>"]
+edition = "2018"
+
+[[bin]]
+name = "demo"
+path = "src/demo.rs"
+
+[dependencies]
+byteorder = "1.3"
+time = "0.1.42"
+ethercat = "0.1.3"
+ethercat-plc = { path = "ethercat-plc" }
+ethercat-derive = { path = "ethercat-derive" }
