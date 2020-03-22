@@ -11,7 +11,7 @@ pub trait ProcessImage {
     fn get_slave_ids() -> Vec<SlaveId>;
     fn get_slave_pdos() -> Vec<Option<Vec<SyncInfo<'static>>>> { vec![None] }
     fn get_slave_regs() -> Vec<Vec<(PdoEntryIndex, Offset)>> { vec![vec![]] }
-    fn get_slave_sdos() -> Vec<Vec<(SdoIndex, Box<dyn SdoData>)>> { vec![vec![]] }
+    fn get_slave_sdos<C: ProcessConfig>(_: &C) -> Vec<Vec<(SdoIndex, &dyn SdoData)>> { vec![vec![]] }
 
     fn size() -> usize where Self: Sized {
         std::mem::size_of::<Self>()
@@ -33,3 +33,22 @@ pub trait ExternImage : Default {
         }
     }
 }
+
+pub trait ProcessConfig {
+    fn get_sdo_var(&self, var: &str) -> Option<&dyn SdoData>;
+}
+
+impl ProcessConfig for () {
+    fn get_sdo_var(&self, _: &str) -> Option<&dyn SdoData> {
+        None
+    }
+}
+
+impl ProcessConfig for std::collections::HashMap<String, Box<dyn SdoData>> {
+    fn get_sdo_var(&self, var: &str) -> Option<&dyn SdoData> {
+        self.get(var).map(|s| &**s)
+    }
+}
+
+// TODO: add a derive macro for ProcessConfig so that you can configure
+// the PLC using a well typed struct

@@ -156,22 +156,34 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
                     {
                         let ix = &nested[0];
                         let subix = &nested[1];
-                        let data_expr = &nested[2];
-                        let data_str = if let syn::NestedMeta::Lit(syn::Lit::Str(s)) = data_expr {
-                            syn::parse_str::<syn::Expr>(&s.value()).unwrap()
-                        } else {
-                            panic!("invalid SDO value, must be stringified")
+                        match &nested[2] {
+                            syn::NestedMeta::Lit(syn::Lit::Str(s)) => {
+                                let data_str = syn::parse_str::<syn::Expr>(&s.value()).unwrap();
+                                sdos.push(quote! {
+                                    (ethercat::SdoIndex { index: #ix, subindex: #subix },
+                                     &#data_str)
+                                });
+                            }
+                            syn::NestedMeta::Meta(syn::Meta::Path(p)) => {
+                                sdos.push(quote! {
+                                    (ethercat::SdoIndex { index: #ix, subindex: #subix },
+                                     {
+                                         match cfg.get_sdo_var(stringify!(#p)) {
+                                             None => panic!(concat!("required config value ",
+                                                                    stringify!(#p), " not given")),
+                                             Some(x) => x
+                                         }
+                                     })
+                                });
+                            }
+                            _ => panic!("invalid SDO value, must be a string or identifier"),
                         };
-                        sdos.push(quote! {
-                            (ethercat::SdoIndex { index: #ix, subindex: #subix },
-                             Box::new(#data_str))
-                        });
                     }
                 }
             }
             let ty = field.ty;
             if sdos.is_empty() {
-                slave_sdos.push(quote!( res.extend(#ty::get_slave_sdos()); ));
+                slave_sdos.push(quote!( res.extend(#ty::get_slave_sdos(&())); ));
             } else {
                 slave_sdos.push(quote!( res.push(vec![#( #sdos ),*]); ));
             }
@@ -194,7 +206,9 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
             fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIndex, ethercat::Offset)>> {
                 let mut res = vec![]; #( res.extend(#slave_tys::get_slave_regs()); )* res
             }
-            fn get_slave_sdos() -> Vec<Vec<(ethercat::SdoIndex, Box<dyn ethercat::SdoData>)>> {
+            fn get_slave_sdos<C: ethercat_plc::ProcessConfig>(cfg: &C) ->
+                Vec<Vec<(ethercat::SdoIndex, &dyn ethercat::SdoData)>>
+            {
                 let mut res = vec![]; #(#slave_sdos)* res
             }
         }

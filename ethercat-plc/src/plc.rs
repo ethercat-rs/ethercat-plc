@@ -13,7 +13,7 @@ use log::*;
 
 use ethercat::*;
 
-use crate::image::{ProcessImage, ExternImage};
+use crate::image::{ProcessImage, ExternImage, ProcessConfig};
 use crate::server::{Server, Request, Response};
 
 #[derive(Default)]
@@ -55,7 +55,7 @@ impl PlcBuilder {
         self
     }
 
-    pub fn build<P: ProcessImage, E: ExternImage>(self) -> Result<Plc<P, E>> {
+    pub fn build<P: ProcessImage, E: ExternImage, PC: ProcessConfig>(self, cfg: PC) -> Result<Plc<P, E>> {
         mlzlog::init(self.logfile_base, &self.name, false, self.debug_logging, true)?;
 
         let channels = if let Some(addr) = self.server_addr {
@@ -78,7 +78,7 @@ impl PlcBuilder {
         let slave_ids = P::get_slave_ids();
         let slave_pdos = P::get_slave_pdos();
         let slave_regs = P::get_slave_regs();
-        let slave_sdos = P::get_slave_sdos();
+        let slave_sdos = P::get_slave_sdos(&cfg);
         for (i, (((id, pdos), regs), sdos)) in slave_ids.into_iter()
                                                         .zip(slave_pdos)
                                                         .zip(slave_regs)

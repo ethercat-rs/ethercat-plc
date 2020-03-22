@@ -18,7 +18,7 @@ const INDEXER_OFFS: u16 = 6;
 #[derive(ProcessImage)]
 struct Image {
     coupler: EK1100,
-    #[sdo(0x8010, 1, "750u16")]  // normal current 750 mA
+    #[sdo(0x8010, 1, motor_current)]  // normal current 750 mA
     #[sdo(0x8010, 2, "250u16")]  // reduced current 250 mA
     #[sdo(0x8010, 3, "2400u16")] // supply is 24 V
     #[sdo(0x8010, 4, "1000u16")] // resistance is 10 Ohm
@@ -231,11 +231,14 @@ fn fb_magnet(inp: &mut EL3104, outp: &mut EL4132,
 }
 
 fn main() {
+    let mut config = std::collections::HashMap::new();
+    config.insert("motor_current".into(), Box::new(750u16) as Box<dyn ethercat::SdoData>);
+
     let mut plc = PlcBuilder::new("plc")
         .cycle_freq(100)
         .with_server("0.0.0.0:5020")
         .logging_cfg(None, false)
-        .build::<Image, Extern>().unwrap();
+        .build::<Image, Extern, _>(config).unwrap();
 
     let mut globals = Globals::default();
     globals.devices = vec![
