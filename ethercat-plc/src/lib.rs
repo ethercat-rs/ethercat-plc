@@ -10,4 +10,5 @@ pub mod mlz_spec;
 
 pub use self::plc::{Plc, PlcBuilder};
 pub use self::image::{ExternImage, ProcessImage, ProcessConfig};
+pub use self::server::{Server, NoServer, TcpServer, ModbusHandler, SimpleHandler};
 pub use ethercat_derive::{ExternImage, ProcessImage, SlaveProcessImage};

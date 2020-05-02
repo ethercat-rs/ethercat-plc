@@ -6,8 +6,7 @@
 
 use std::{thread, time::Duration, marker::PhantomData};
 use time::precise_time_ns;
-use byteorder::{ByteOrder, NativeEndian as NE};
-use crossbeam_channel::{Sender, Receiver};
+use crossbeam_channel::{unbounded, Sender, Receiver};
 use mlzlog;
 use log::*;
 
@@ -55,13 +54,14 @@ impl PlcBuilder {
         self
     }
 
-    pub fn build<P: ProcessImage, E: ExternImage, PC: ProcessConfig>(self, cfg: PC) -> Result<Plc<P, E>> {
+    pub fn build<P: ProcessImage, E: ExternImage, PC: ProcessConfig, S: Server>(self, cfg: PC) -> Result<Plc<P, E, S>> {
         mlzlog::init(self.logfile_base, &self.name, false, self.debug_logging, true)?;
 
         let channels = if let Some(addr) = self.server_addr {
-            let (srv, r, w) = Server::new();
-            srv.start(&addr)?;
-            Some((r, w))
+            let (w_from_plc, r_from_plc) = unbounded();
+            let (w_to_plc, r_to_plc) = unbounded();
+            S::start(&addr, w_to_plc, r_from_plc)?;
+            Some((r_to_plc, w_from_plc))
         } else {
             None
         };
@@ -131,7 +131,7 @@ impl PlcBuilder {
         Ok(Plc {
             master: master,
             domain: domain,
-            server: channels,
+            server_channel: channels,
             sleep: 1000_000_000 / self.cycle_freq.unwrap_or(1000) as u64,
             _types: (PhantomData, PhantomData),
         })
@@ -139,17 +139,15 @@ impl PlcBuilder {
 }
 
 
-pub struct Plc<P, E> {
+pub struct Plc<P, E, S: Server> {
     master: Master,
     domain: DomainHandle,
     sleep:  u64,
-    server: Option<(Receiver<Request>, Sender<Response>)>,
+    server_channel: Option<(Receiver<Request<S::Extra>>, Sender<Response<S::Extra>>)>,
     _types: (PhantomData<P>, PhantomData<E>),
 }
 
-const BASE: usize = 0x3000;
-
-impl<P: ProcessImage, E: ExternImage> Plc<P, E> {
+impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
     pub fn run<F>(&mut self, mut cycle_fn: F)
     where F: FnMut(&mut P, &mut E)
     {
@@ -163,26 +161,24 @@ impl<P: ProcessImage, E: ExternImage> Plc<P, E> {
                 warn!("error in cycle: {}", e);
             }
 
-            // external data exchange via modbus
-            if let Some((r, w)) = self.server.as_mut() {
+            // external data exchange
+            if let Some((r, w)) = self.server_channel.as_mut() {
                 while let Ok(mut req) = r.try_recv() {
                     debug!("PLC got request: {:?}", req);
                     let data = ext.cast();
-                    let resp = if req.addr < BASE || req.addr + req.count > BASE + E::size()/2 {
+                    let resp = if req.addr + req.count > E::size() {
                         Response::Error(req, 2)
                     } else {
-                        let from = 2 * (req.addr - BASE);
-                        let to = from + 2 * req.count;
+                        let from = req.addr;
+                        let to = from + req.count;
                         if let Some(ref mut values) = req.write {
                             // write request
-                            NE::write_u16_into(values, &mut data[from..to]);
+                            data[from..to].copy_from_slice(&values);
                             let values = req.write.take().unwrap();
                             Response::Ok(req, values)
                         } else {
                             // read request
-                            let mut values = vec![0; req.count];
-                            NE::read_u16_into(&data[from..to], &mut values);
-                            Response::Ok(req, values)
+                            Response::Ok(req, data[from..to].to_vec())
                         }
                     };
                     debug!("PLC response: {:?}", resp);

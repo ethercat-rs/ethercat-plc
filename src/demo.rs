@@ -1,7 +1,7 @@
 // Part of ethercat-rs. Copyright 2018-2019 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
 
-use ethercat_plc::{PlcBuilder, ProcessImage, ExternImage};
+use ethercat_plc::{PlcBuilder, ProcessImage, ExternImage, TcpServer, ModbusHandler};
 use ethercat_plc::beckhoff::*;
 use ethercat_plc::mlz_spec::*;
 
@@ -238,7 +238,7 @@ fn main() {
         .cycle_freq(100)
         .with_server("0.0.0.0:5020")
         .logging_cfg(None, false)
-        .build::<Image, Extern, _>(config).unwrap();
+        .build::<Image, Extern, _, TcpServer<ModbusHandler>>(config).unwrap();
 
     let mut globals = Globals::default();
     globals.devices = vec![
