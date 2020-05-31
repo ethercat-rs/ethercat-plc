@@ -54,6 +54,25 @@ impl PlcBuilder {
         self
     }
 
+    pub fn build_simulator<E: ExternImage, S: Server>(self) -> Result<PlcSimulator<E, S>> {
+        mlzlog::init(self.logfile_base, &self.name, false, self.debug_logging, true)?;
+
+        let channels = if let Some(addr) = self.server_addr {
+            let (w_from_plc, r_from_plc) = unbounded();
+            let (w_to_plc, r_to_plc) = unbounded();
+            S::start(&addr, w_to_plc, r_from_plc)?;
+            Some((r_to_plc, w_from_plc))
+        } else {
+            None
+        };
+
+        Ok(PlcSimulator {
+            server_channel: channels,
+            sleep: 1000_000_000 / self.cycle_freq.unwrap_or(1000) as u64,
+            _types: PhantomData,
+        })
+    }
+
     pub fn build<P: ProcessImage, E: ExternImage, PC: ProcessConfig, S: Server>(self, cfg: PC) -> Result<Plc<P, E, S>> {
         mlzlog::init(self.logfile_base, &self.name, false, self.debug_logging, true)?;
 
@@ -133,8 +152,36 @@ impl PlcBuilder {
             domain: domain,
             server_channel: channels,
             sleep: 1000_000_000 / self.cycle_freq.unwrap_or(1000) as u64,
-            _types: (PhantomData, PhantomData),
+            _types: PhantomData,
         })
+    }
+}
+
+pub type ServerChannels<X> = (Receiver<Request<X>>, Sender<Response<X>>);
+
+pub fn data_exchange<E: ExternImage, X: std::fmt::Debug>(chan: &mut ServerChannels<X>, ext: &mut E) {
+    while let Ok(mut req) = chan.0.try_recv() {
+        debug!("PLC sim got request: {:?}", req);
+        let data = ext.cast();
+        let resp = if req.addr + req.count > E::size() {
+            Response::Error(req, 2)
+        } else {
+            let from = req.addr;
+            let to = from + req.count;
+            if let Some(ref mut values) = req.write {
+                // write request
+                data[from..to].copy_from_slice(&values);
+                let values = req.write.take().unwrap();
+                Response::Ok(req, values)
+            } else {
+                // read request
+                Response::Ok(req, data[from..to].to_vec())
+            }
+        };
+        debug!("PLC sim response: {:?}", resp);
+        if let Err(e) = chan.1.send(resp) {
+            warn!("could not send back response: {}", e);
+        }
     }
 }
 
@@ -143,8 +190,8 @@ pub struct Plc<P, E, S: Server> {
     master: Master,
     domain: DomainHandle,
     sleep:  u64,
-    server_channel: Option<(Receiver<Request<S::Extra>>, Sender<Response<S::Extra>>)>,
-    _types: (PhantomData<P>, PhantomData<E>),
+    server_channel: Option<ServerChannels<S::Extra>>,
+    _types: PhantomData<(P, E)>,
 }
 
 impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
@@ -162,30 +209,8 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
             }
 
             // external data exchange
-            if let Some((r, w)) = self.server_channel.as_mut() {
-                while let Ok(mut req) = r.try_recv() {
-                    debug!("PLC got request: {:?}", req);
-                    let data = ext.cast();
-                    let resp = if req.addr + req.count > E::size() {
-                        Response::Error(req, 2)
-                    } else {
-                        let from = req.addr;
-                        let to = from + req.count;
-                        if let Some(ref mut values) = req.write {
-                            // write request
-                            data[from..to].copy_from_slice(&values);
-                            let values = req.write.take().unwrap();
-                            Response::Ok(req, values)
-                        } else {
-                            // read request
-                            Response::Ok(req, data[from..to].to_vec())
-                        }
-                    };
-                    debug!("PLC response: {:?}", resp);
-                    if let Err(e) = w.send(resp) {
-                        warn!("could not send back response: {}", e);
-                    }
-                }
+            if let Some(chan) = self.server_channel.as_mut() {
+                data_exchange(chan, &mut ext);
             }
 
             // wait until next cycle
@@ -213,5 +238,39 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
         self.master.domain(self.domain).queue()?;
         self.master.send()?;
         Ok(())
+    }
+}
+
+
+/// An object similar to Plc, but not connected to an Ethercat master.
+pub struct PlcSimulator<E, S: Server> {
+    sleep: u64,
+    server_channel: Option<(Receiver<Request<S::Extra>>, Sender<Response<S::Extra>>)>,
+    _types: PhantomData<E>,
+}
+
+impl<E: ExternImage, S: Server> PlcSimulator<E, S> {
+    pub fn run<F>(&mut self, mut cycle_fn: F)
+    where F: FnMut(&mut E)
+    {
+        let mut ext = E::default();
+        let mut cycle_start = precise_time_ns();
+
+        loop {
+            // simulate a cycle
+            cycle_fn(&mut ext);
+
+            // data exchange with upper layer
+            if let Some(chan) = self.server_channel.as_mut() {
+                data_exchange(chan, &mut ext);
+            }
+
+            // wait until next cycle
+            let now = precise_time_ns();
+            cycle_start += self.sleep;
+            if cycle_start > now {
+                thread::sleep(Duration::from_nanos(cycle_start - now));
+            }
+        }
     }
 }
