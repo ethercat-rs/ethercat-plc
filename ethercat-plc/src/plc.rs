@@ -161,6 +161,7 @@ pub type ServerChannels<X> = (Receiver<Request<X>>, Sender<Response<X>>);
 
 pub fn data_exchange<E: ExternImage, X: std::fmt::Debug>(chan: &mut ServerChannels<X>, ext: &mut E) {
     while let Ok(mut req) = chan.0.try_recv() {
+        let mut done = false;
         debug!("PLC sim got request: {:?}", req);
         let data = ext.cast();
         let resp = if req.addr + req.count > E::size() {
@@ -172,6 +173,8 @@ pub fn data_exchange<E: ExternImage, X: std::fmt::Debug>(chan: &mut ServerChanne
                 // write request
                 data[from..to].copy_from_slice(&values);
                 let values = req.write.take().unwrap();
+                // let a PLC cycle run after a write request
+                done = true;
                 Response::Ok(req, values)
             } else {
                 // read request
@@ -181,6 +184,9 @@ pub fn data_exchange<E: ExternImage, X: std::fmt::Debug>(chan: &mut ServerChanne
         debug!("PLC sim response: {:?}", resp);
         if let Err(e) = chan.1.send(resp) {
             warn!("could not send back response: {}", e);
+        }
+        if done {
+            break;
         }
     }
 }
