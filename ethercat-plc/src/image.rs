@@ -9,9 +9,9 @@ pub trait ProcessImage {
     // configuration APIs
     const SLAVE_COUNT: usize;
     fn get_slave_ids() -> Vec<SlaveId>;
-    fn get_slave_pdos() -> Vec<Option<Vec<SyncInfo<'static>>>> { vec![None] }
-    fn get_slave_regs() -> Vec<Vec<(PdoEntryIndex, Offset)>> { vec![vec![]] }
-    fn get_slave_sdos<C: ProcessConfig>(_: &C) -> Vec<Vec<(SdoIndex, &dyn SdoData)>> { vec![vec![]] }
+    fn get_slave_pdos() -> Vec<Option<Vec<(SmCfg, Vec<PdoCfg>)>>> { vec![None] }
+    fn get_slave_regs() -> Vec<Vec<(PdoEntryIdx, Offset)>> { vec![vec![]] }
+    fn get_slave_sdos<C: ProcessConfig>(_: &C) -> Vec<Vec<(SdoIdx, &dyn SdoData)>> { vec![vec![]] }
 
     fn size() -> usize where Self: Sized {
         std::mem::size_of::<Self>()

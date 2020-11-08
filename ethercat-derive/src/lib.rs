@@ -56,14 +56,19 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                             (quote!(#pdo).to_string(), &nested[1], &nested[2])
                         };
                         pdo_regs.push(quote! {
-                            (ethercat::PdoEntryIndex { index: #ix,
-                                                       subindex: #subix },
+                            (ethercat::PdoEntryIdx { idx: ethercat::Idx::from(#ix),
+                                                     sub_idx: ethercat::SubIdx::from(#subix) },
                              ethercat::Offset { byte: #running_size, bit: 0 })
                         });
                         pdo_mapping.entry(pdo_str).or_insert_with(Vec::new).push(quote! {
                             ethercat::PdoEntryInfo {
-                                index: PdoEntryIndex { index: #ix, subindex: #subix },
-                                bit_length: #bitlen as u8,
+                                entry_idx: ethercat::PdoEntryIdx {
+                                    idx: ethercat::Idx::from(#ix),
+                                    sub_idx: ethercat::SubIdx::from(#subix)
+                                },
+                                bit_len: #bitlen as u8,
+                                name: String::new(),
+                                pos: ethercat::PdoEntryPos::from(0),  // unused
                             }
                         });
                     }
@@ -87,25 +92,21 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                     let pdo_str = quote!(#pdo_index).to_string();
                     let entries = &pdo_mapping.get(&pdo_str).map_or(&[][..], |v| &*v);
                     pdos.push(quote! {
-                        ethercat::PdoInfo {
-                            index: #pdo_index,
-                            entries: {
-                                const ENTRIES: &[ethercat::PdoEntryInfo] =
-                                    &[#( #entries ),*]; ENTRIES
-                            }
+                        ethercat::PdoCfg {
+                            idx: PdoIdx::from(#pdo_index),
+                            entries: vec![#( #entries ),*]
                         }
                     })
                 }
                 sync_infos.push(quote! {
-                    ethercat::SyncInfo {
-                        index: #sm,
-                        direction: ethercat::SyncDirection::#sd,
-                        watchdog_mode: ethercat::WatchdogMode::Default,
-                        pdos: {
-                            const INFOS: &[ethercat::PdoInfo<'static>] =
-                                &[#( #pdos ),*]; INFOS
-                        }
-                    }
+                    (
+                        ethercat::SmCfg {
+                            idx: SmIdx::from(#sm),
+                            direction: ethercat::SyncDirection::#sd,
+                            watchdog_mode: ethercat::WatchdogMode::Default,
+                        },
+                        vec![#( #pdos ),*]
+                    )
                 });
             }
         }
@@ -122,10 +123,10 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
         impl ProcessImage for #ident {
             const SLAVE_COUNT: usize = 1;
             fn get_slave_ids() -> Vec<SlaveId> { vec![#slave_id] }
-            fn get_slave_pdos() -> Vec<Option<Vec<SyncInfo<'static>>>> {
+            fn get_slave_pdos() -> Vec<Option<Vec<(SmCfg, Vec<PdoCfg>)>>> {
                 vec![#sync_infos]
             }
-            fn get_slave_regs() -> Vec<Vec<(PdoEntryIndex, Offset)>> {
+            fn get_slave_regs() -> Vec<Vec<(PdoEntryIdx, Offset)>> {
                 vec![vec![ #( #pdo_regs ),* ]]
             }
         }
@@ -160,13 +161,15 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
                             syn::NestedMeta::Lit(syn::Lit::Str(s)) => {
                                 let data_str = syn::parse_str::<syn::Expr>(&s.value()).unwrap();
                                 sdos.push(quote! {
-                                    (ethercat::SdoIndex { index: #ix, subindex: #subix },
+                                    (ethercat::SdoIdx { idx: ethercat::Idx::from(#ix),
+                                                        sub_idx: ethercat::SubIdx::from(#subix) },
                                      &#data_str)
                                 });
                             }
                             syn::NestedMeta::Meta(syn::Meta::Path(p)) => {
                                 sdos.push(quote! {
-                                    (ethercat::SdoIndex { index: #ix, subindex: #subix },
+                                    (ethercat::SdoIdx { idx: ethercat::Idx::from(#ix),
+                                                        sub_idx: ethercat::SubIdx::from(#subix) },
                                      {
                                          match cfg.get_sdo_var(stringify!(#p)) {
                                              None => panic!(concat!("required config value ",
@@ -200,14 +203,14 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
             fn get_slave_ids() -> Vec<ethercat::SlaveId> {
                 let mut res = vec![]; #( res.extend(#slave_tys::get_slave_ids()); )* res
             }
-            fn get_slave_pdos() -> Vec<Option<Vec<ethercat::SyncInfo<'static>>>> {
+            fn get_slave_pdos() -> Vec<Option<Vec<(ethercat::SmCfg, Vec<ethercat::PdoCfg>)>>> {
                 let mut res = vec![]; #( res.extend(#slave_tys::get_slave_pdos()); )* res
             }
-            fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIndex, ethercat::Offset)>> {
+            fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIdx, ethercat::Offset)>> {
                 let mut res = vec![]; #( res.extend(#slave_tys::get_slave_regs()); )* res
             }
             fn get_slave_sdos<C: ethercat_plc::ProcessConfig>(cfg: &C) ->
-                Vec<Vec<(ethercat::SdoIndex, &dyn ethercat::SdoData)>>
+                Vec<Vec<(ethercat::SdoIdx, &dyn ethercat::SdoData)>>
             {
                 let mut res = vec![]; #(#slave_sdos)* res
             }

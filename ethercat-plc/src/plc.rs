@@ -85,7 +85,8 @@ impl PlcBuilder {
             None
         };
 
-        let mut master = Master::reserve(self.master_id.unwrap_or(0))?;
+        let mut master = Master::open(self.master_id.unwrap_or(0), MasterAccess::ReadWrite)?;
+        master.reserve()?;
         let domain = master.create_domain()?;
 
         debug!("PLC: EtherCAT master opened");
@@ -105,8 +106,10 @@ impl PlcBuilder {
                                                         .enumerate()
         {
             let mut config = master.configure_slave(SlaveAddr::ByPos(i as u16), id)?;
-            if let Some(pdos) = pdos {
-                config.config_pdos(&pdos)?;
+            if let Some(sm_pdos) = pdos {
+                for (sm, pdos) in sm_pdos {
+                    config.config_sm_pdos(sm, &pdos)?;
+                }
             }
             let mut first_byte = 0;
             for (j, (entry, mut expected_position)) in regs.into_iter().enumerate() {
@@ -194,7 +197,7 @@ pub fn data_exchange<E: ExternImage, X: std::fmt::Debug>(chan: &mut ServerChanne
 
 pub struct Plc<P, E, S: Server> {
     master: Master,
-    domain: DomainHandle,
+    domain: DomainIdx,
     sleep:  u64,
     server_channel: Option<ServerChannels<S::Extra>>,
     _types: PhantomData<(P, E)>,
@@ -238,7 +241,7 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
         // println!("master state: {:?}", self.master.state());
         // println!("domain state: {:?}", self.master.domain(self.domain).state());
 
-        let data = P::cast(self.master.domain_data(self.domain));
+        let data = P::cast(self.master.domain_data(self.domain)?);
         cycle_fn(data, ext);
 
         self.master.domain(self.domain).queue()?;
