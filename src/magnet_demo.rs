@@ -232,7 +232,7 @@ fn fb_magnet(inp: &mut EL3104, outp: &mut EL4132,
 
 fn main() {
     let mut config = std::collections::HashMap::new();
-    config.insert("motor_current".into(), Box::new(750u16) as Box<dyn ethercat::SdoData>);
+    config.insert("motor_current", Box::new(750u16) as Box<dyn ethercat::SdoData>);
 
     let mut plc = PlcBuilder::new("plc")
         .cycle_freq(100)

@@ -50,5 +50,11 @@ impl ProcessConfig for std::collections::HashMap<String, Box<dyn SdoData>> {
     }
 }
 
+impl<'a> ProcessConfig for std::collections::HashMap<&'a str, Box<dyn SdoData>> {
+    fn get_sdo_var(&self, var: &str) -> Option<&dyn SdoData> {
+        self.get(var).map(|s| &**s)
+    }
+}
+
 // TODO: add a derive macro for ProcessConfig so that you can configure
 // the PLC using a well typed struct
