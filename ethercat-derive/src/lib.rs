@@ -7,6 +7,7 @@ extern crate proc_macro;  // needed even in 2018
 
 use self::proc_macro::TokenStream;
 use syn::parse_macro_input;
+use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
 use quote::ToTokens;
 
@@ -130,6 +131,29 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                 vec![vec![ #( #pdo_regs ),* ]]
             }
         }
+
+        macro_rules! impl_it {
+            ($n:literal) => {
+                impl ProcessImage for [#ident; $n] {
+                    const SLAVE_COUNT: usize = $n;
+                    fn get_slave_ids() -> Vec<SlaveId> { vec![#slave_id; $n] }
+                    fn get_slave_pdos() -> Vec<Option<Vec<(SmCfg, Vec<PdoCfg>)>>> {
+                        vec![#sync_infos; $n]
+                    }
+                    fn get_slave_regs() -> Vec<Vec<(PdoEntryIdx, Offset)>> {
+                        vec![vec![ #( #pdo_regs ),* ]; $n]
+                    }
+                }
+            };
+        }
+
+        impl_it!(2);
+        impl_it!(3);
+        impl_it!(4);
+        impl_it!(5);
+        impl_it!(6);
+        impl_it!(7);
+        impl_it!(8);
     };
 
     // println!("{}", generated);
@@ -137,7 +161,36 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
 }
 
 
-#[proc_macro_derive(ProcessImage, attributes(sdo))]
+fn sdo_extract(ix: &syn::NestedMeta, subix: &syn::NestedMeta, val: &syn::NestedMeta,
+               sdos: &mut Vec<TokenStream2>) {
+    match val {
+        syn::NestedMeta::Lit(syn::Lit::Str(s)) => {
+            let data_str = syn::parse_str::<syn::Expr>(&s.value()).unwrap();
+            sdos.push(quote! {
+                (ethercat::SdoIdx { idx: ethercat::Idx::from(#ix),
+                                    sub_idx: ethercat::SubIdx::from(#subix) },
+                 &#data_str)
+            });
+        }
+        syn::NestedMeta::Meta(syn::Meta::Path(p)) => {
+            sdos.push(quote! {
+                (ethercat::SdoIdx { idx: ethercat::Idx::from(#ix),
+                                    sub_idx: ethercat::SubIdx::from(#subix) },
+                 {
+                     match cfg.get_sdo_var(stringify!(#p)) {
+                         None => panic!(concat!("required config value ",
+                                                stringify!(#p), " not given")),
+                         Some(x) => x
+                     }
+                 })
+            });
+        }
+        _ => panic!("invalid SDO value, must be a string or identifier"),
+    };
+}
+
+
+#[proc_macro_derive(ProcessImage, attributes(sdo, array_sdo))]
 pub fn derive_process_image(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::DeriveInput);
     let ident = input.ident;
@@ -149,46 +202,39 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
         fields: syn::Fields::Named(flds), ..
     }) = input.data {
         for field in flds.named {
-            let mut sdos = vec![];
+            let mut single_sdos = vec![];
+            let mut array_sdos = vec![];
             for attr in &field.attrs {
                 if attr.path.is_ident("sdo") {
                     if let syn::Meta::List(syn::MetaList { nested, .. }) =
                         attr.parse_meta().unwrap()
                     {
-                        let ix = &nested[0];
-                        let subix = &nested[1];
-                        match &nested[2] {
-                            syn::NestedMeta::Lit(syn::Lit::Str(s)) => {
-                                let data_str = syn::parse_str::<syn::Expr>(&s.value()).unwrap();
-                                sdos.push(quote! {
-                                    (ethercat::SdoIdx { idx: ethercat::Idx::from(#ix),
-                                                        sub_idx: ethercat::SubIdx::from(#subix) },
-                                     &#data_str)
-                                });
-                            }
-                            syn::NestedMeta::Meta(syn::Meta::Path(p)) => {
-                                sdos.push(quote! {
-                                    (ethercat::SdoIdx { idx: ethercat::Idx::from(#ix),
-                                                        sub_idx: ethercat::SubIdx::from(#subix) },
-                                     {
-                                         match cfg.get_sdo_var(stringify!(#p)) {
-                                             None => panic!(concat!("required config value ",
-                                                                    stringify!(#p), " not given")),
-                                             Some(x) => x
-                                         }
-                                     })
-                                });
-                            }
-                            _ => panic!("invalid SDO value, must be a string or identifier"),
+                        sdo_extract(&nested[0], &nested[1], &nested[2], &mut single_sdos);
+                    }
+                } else if attr.path.is_ident("array_sdo") {
+                    if let syn::Meta::List(syn::MetaList { nested, .. }) =
+                        attr.parse_meta().unwrap()
+                    {
+                        let ix: usize = match &nested[0] {
+                            syn::NestedMeta::Lit(syn::Lit::Int(lit)) => lit.base10_parse().unwrap(),
+                            _ => panic!("invalid sdo_array index")
                         };
+                        if array_sdos.len() < ix + 1 {
+                            array_sdos.resize(ix + 1, vec![]);
+                        }
+                        sdo_extract(&nested[1], &nested[2], &nested[3], &mut array_sdos[ix]);
                     }
                 }
             }
             let ty = field.ty;
-            if sdos.is_empty() {
-                slave_sdos.push(quote!( res.extend(#ty::get_slave_sdos(&())); ));
+            if !array_sdos.is_empty() {
+                for single in array_sdos {
+                    slave_sdos.push(quote!( res.push(vec![#( #single ),*]); ));
+                }
+            } else if !single_sdos.is_empty() {
+                slave_sdos.push(quote!( res.push(vec![#( #single_sdos ),*]); ));
             } else {
-                slave_sdos.push(quote!( res.push(vec![#( #sdos ),*]); ));
+                slave_sdos.push(quote!( res.extend(#ty::get_slave_sdos(&())); ));
             }
             slave_tys.push(ty);
         }
@@ -199,15 +245,15 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
     let generated = quote! {
         #[automatically_derived]
         impl ProcessImage for #ident {
-            const SLAVE_COUNT: usize = #( #slave_tys::SLAVE_COUNT )+*;
+            const SLAVE_COUNT: usize = #( <#slave_tys>::SLAVE_COUNT )+*;
             fn get_slave_ids() -> Vec<ethercat::SlaveId> {
-                let mut res = vec![]; #( res.extend(#slave_tys::get_slave_ids()); )* res
+                let mut res = vec![]; #( res.extend(<#slave_tys>::get_slave_ids()); )* res
             }
             fn get_slave_pdos() -> Vec<Option<Vec<(ethercat::SmCfg, Vec<ethercat::PdoCfg>)>>> {
-                let mut res = vec![]; #( res.extend(#slave_tys::get_slave_pdos()); )* res
+                let mut res = vec![]; #( res.extend(<#slave_tys>::get_slave_pdos()); )* res
             }
             fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIdx, ethercat::Offset)>> {
-                let mut res = vec![]; #( res.extend(#slave_tys::get_slave_regs()); )* res
+                let mut res = vec![]; #( res.extend(<#slave_tys>::get_slave_regs()); )* res
             }
             fn get_slave_sdos<C: ethercat_plc::ProcessConfig>(cfg: &C) ->
                 Vec<Vec<(ethercat::SdoIdx, &dyn ethercat::SdoData)>>
