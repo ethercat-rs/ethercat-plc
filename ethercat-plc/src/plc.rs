@@ -244,6 +244,7 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
         let data = P::cast(self.master.domain_data(self.domain)?);
         cycle_fn(data, ext);
 
+        self.master.set_application_time(0)?;
         self.master.domain(self.domain).queue()?;
         self.master.send()?;
         Ok(())
