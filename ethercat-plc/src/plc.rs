@@ -145,6 +145,7 @@ impl PlcBuilder {
             panic!("size: {} != {}", domain_size, P::size());
         }
 
+        master.set_application_time(1)?;  // 0 is not good
         master.activate()?;
         info!("PLC: EtherCAT master activated");
 
