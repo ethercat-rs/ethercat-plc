@@ -12,7 +12,7 @@ use quote::quote;
 use quote::ToTokens;
 
 
-#[proc_macro_derive(SlaveProcessImage, attributes(slave_id, pdos, entry))]
+#[proc_macro_derive(SlaveProcessImage, attributes(pdos, entry))]
 pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::DeriveInput);
     let ident = input.ident;
@@ -190,13 +190,14 @@ fn sdo_extract(ix: &syn::NestedMeta, subix: &syn::NestedMeta, val: &syn::NestedM
 }
 
 
-#[proc_macro_derive(ProcessImage, attributes(sdo, array_sdo))]
+#[proc_macro_derive(ProcessImage, attributes(slave_id, sdo, array_sdo))]
 pub fn derive_process_image(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::DeriveInput);
     let ident = input.ident;
 
     let mut slave_sdos = vec![];
     let mut slave_tys = vec![];
+    let mut slave_ids = vec![];
 
     if let syn::Data::Struct(syn::DataStruct {
         fields: syn::Fields::Named(flds), ..
@@ -204,6 +205,7 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
         for field in flds.named {
             let mut single_sdos = vec![];
             let mut array_sdos = vec![];
+            let mut id = None;
             for attr in &field.attrs {
                 if attr.path.is_ident("sdo") {
                     if let syn::Meta::List(syn::MetaList { nested, .. }) =
@@ -224,6 +226,16 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
                         }
                         sdo_extract(&nested[1], &nested[2], &nested[3], &mut array_sdos[ix]);
                     }
+                } else if attr.path.is_ident("slave_id") {
+                    if let syn::Meta::List(syn::MetaList { nested, .. }) =
+                        attr.parse_meta().unwrap()
+                    {
+                        if let syn::NestedMeta::Lit(syn::Lit::Int(p)) = &nested[0] {
+                            id = Some(quote!(
+                                vec![ethercat::SlaveId { vendor_id: 2, product_code: (#p << 16) | 0x3052 }]
+                            ));
+                        }
+                    }
                 }
             }
             let ty = field.ty;
@@ -236,7 +248,9 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
             } else {
                 slave_sdos.push(quote!( res.extend(#ty::get_slave_sdos(&())); ));
             }
+            let id = id.unwrap_or(quote!( <#ty>::get_slave_ids() ));
             slave_tys.push(ty);
+            slave_ids.push(id);
         }
     } else {
         return compile_error("only structs with named fields can be a process image");
@@ -247,7 +261,7 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
         impl ProcessImage for #ident {
             const SLAVE_COUNT: usize = #( <#slave_tys>::SLAVE_COUNT )+*;
             fn get_slave_ids() -> Vec<ethercat::SlaveId> {
-                let mut res = vec![]; #( res.extend(<#slave_tys>::get_slave_ids()); )* res
+                let mut res = vec![]; #( res.extend(#slave_ids); )* res
             }
             fn get_slave_pdos() -> Vec<Option<Vec<(ethercat::SmCfg, Vec<ethercat::PdoCfg>)>>> {
                 let mut res = vec![]; #( res.extend(<#slave_tys>::get_slave_pdos()); )* res
