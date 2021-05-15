@@ -11,8 +11,6 @@ pub struct EK1100 {}
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
-// #[pdos(3, Input,  0x1A00, 0x1A01, 0x1A02, 0x1A03, 0x1A04, 0x1A05, 0x1A06, 0x1A07)]
-// #[pdos(2, Output, 0x1600, 0x1601, 0x1602, 0x1603)]
 pub struct EK1818 {
     #[entry(0x6000, 1)]  pub input: u8,
     #[entry(0x7000, 1)]  pub output: u8,
@@ -93,10 +91,9 @@ pub struct EL4132 {
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
-#[pdos(3, Input, 0x1A00)]
 pub struct EL5001 {
-    #[entry(0x1A00, 0x6000, 1)]  pub status_ch1: u16,
-    #[entry(0x1A00, 0x6000, 0x11)] pub value_ch1: u32,
+    #[entry(0x3101, 1)] pub status_ch1: u8,
+    #[entry(0x3101, 2)] pub value_ch1: u32,
 }
 
 #[repr(C, packed)]
