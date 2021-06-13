@@ -71,6 +71,32 @@ pub struct EL2008 {
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
+#[pdos(3, Input,  0x1A00, 0x1A02)]
+#[pdos(2, Output, 0x1600, 0x1601)]
+pub struct EL2535 {
+    #[entry(0x1A00, 0x6000, 1)]    pub state_ch1: u16,
+    #[entry(0x1A02, 0x6010, 1)]    pub state_ch2: u16,
+
+    #[entry(0x1600, 0x7000, 1)]    pub control_ch1: u16,
+    #[entry(0x1600, 0x7000, 0x11)] pub output_ch1: u16,
+    #[entry(0x1601, 0x7010, 1)]    pub control_ch2: u16,
+    #[entry(0x1601, 0x7010, 0x11)] pub output_ch2: u16,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
+pub struct EL2612 {
+    #[entry(0x7000, 1)]  pub output: u8,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
+pub struct EL2624 {
+    #[entry(0x7000, 1)]  pub output: u8,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
 pub struct EL3104 {
     #[entry(0x6000, 1)]  pub ch1_status: u16,
     #[entry(0x6000, 17)] pub ch1: i16,
