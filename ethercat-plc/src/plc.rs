@@ -147,6 +147,7 @@ impl PlcBuilder {
             panic!("size: {} != {}", domain_size, P::size());
         }
 
+        master.set_application_time(1)?;  // 0 is not good
         master.activate()?;
         info!("PLC: EtherCAT master activated");
 
@@ -244,7 +245,6 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
         let data = P::cast(self.master.domain_data(self.domain)?);
         cycle_fn(data, ext);
 
-        self.master.set_application_time(0)?;
         self.master.domain(self.domain).queue()?;
         self.master.send()?;
         Ok(())
