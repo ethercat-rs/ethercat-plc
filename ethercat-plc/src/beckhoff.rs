@@ -134,15 +134,25 @@ pub struct EL5002 {
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
+#[pdos(3, Input, 0x1A00, 0x1A01)]
+pub struct EL5032 {
+    #[entry(0x1A00, 0x6000, 1)]  pub status_ch1: u16,
+    #[entry(0x1A00, 0x6000, 11)] pub value_ch1: u64,
+    #[entry(0x1A01, 0x6010, 1)]  pub status_ch2: u16,
+    #[entry(0x1A01, 0x6010, 11)] pub value_ch2: u64,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A00, 0x1A02)]
 #[pdos(2, Output, 0x1600, 0x1601)]
 pub struct EL5072 {
     #[entry(0x1A00, 0x6000, 1)]  pub status_ch1: u16,
-    #[entry(0x1A00, 0x6001, 1)]  pub value_ch1: u32,
-    #[entry(0x1A00, 0x6001, 2)]  pub latch_ch1: u32,
+    #[entry(0x1A00, 0x6001, 1)]  pub value_ch1: i32,
+    #[entry(0x1A00, 0x6001, 2)]  pub latch_ch1: i32,
     #[entry(0x1A02, 0x6010, 1)]  pub status_ch2: u16,
-    #[entry(0x1A02, 0x6011, 1)]  pub value_ch2: u32,
-    #[entry(0x1A02, 0x6011, 2)]  pub latch_ch2: u32,
+    #[entry(0x1A02, 0x6011, 1)]  pub value_ch2: i32,
+    #[entry(0x1A02, 0x6011, 2)]  pub latch_ch2: i32,
 
     #[entry(0x1600, 0x7000, 1)]    pub control_ch1: u32,
     #[entry(0x1600, 0x7000, 0x11)] pub set_counter_ch1: u32,
