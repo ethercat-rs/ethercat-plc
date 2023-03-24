@@ -111,6 +111,7 @@ impl PlcBuilder {
                     config.config_sm_pdos(sm, &pdos)?;
                 }
             }
+
             let mut first_byte = 0;
             for (j, (entry, mut expected_position)) in regs.into_iter().enumerate() {
                 let pos = config.register_pdo_entry(entry, domain)?;
@@ -129,6 +130,26 @@ impl PlcBuilder {
 
             for (sdo_index, data) in sdos {
                 config.add_sdo(sdo_index, &*data)?;
+            }
+
+            if id.product_code == 0x1c353052 || id.product_code == 0x1c2b3052 {
+                config.config_dc(0x700, 2000000, 30000, 2000000, 1000)?;
+                /*
+                config.config_watchdog(0, 0)?;
+                let mut data = vec![0, 0];
+                config.write_register(0x400, &data)?;
+                config.write_register(0x410, &data)?;
+                config.write_register(0x420, &data)?;
+                config.read_register(0x400, &mut data)?;
+                println!(">> {:?}", data);
+                config.read_register(0x410, &mut data)?;
+                println!(">> {:?}", data);
+                config.read_register(0x420, &mut data)?;
+                println!(">> {:?}", data);
+                */
+            }
+            if id.product_code == 0x13a83052 {
+                config.config_watchdog(1, 1)?;
             }
 
             let cfg_index = config.index();
@@ -210,8 +231,13 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
     {
         let mut ext = E::default();
         let mut cycle_start = precise_time_ns();
+//        let mut i = 1;
 
         loop {
+//            i += 1;
+            // update application time
+            //let _ = self.master.set_application_time(i);
+
             // process data exchange + logic
             if let Err(e) = self.single_cycle(&mut cycle_fn, &mut ext) {
                 // XXX: logging unconditionally here is bad, could repeat endlessly

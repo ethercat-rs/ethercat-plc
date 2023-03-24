@@ -260,3 +260,53 @@ pub struct EL7047_Positioning {
     #[entry(0x1606, 0x7020, 23)] pub accel: u16,
     #[entry(0x1606, 0x7020, 24)] pub decel: u16,
 }
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
+#[pdos(3, Input,  0x1A00, 0x1A01, 0x1A02, 0x1A03, 0x1A04, 0x1A05, 0x1A06, 0x1A0E)]
+#[pdos(2, Output, 0x1600, 0x1601, 0x1608)]
+pub struct EL7211_0010_Velocity {
+    #[entry(0x1A00, 0x6000, 0x11)] pub act_pos: u32,
+    #[entry(0x1A01, 0x6010, 1)]    pub mot_status: u16,
+    #[entry(0x1A02, 0x6010, 7)]    pub act_velo: i32,
+    #[entry(0x1A03, 0x6010, 8)]    pub act_torq: i16,
+    #[entry(0x1A04, 0x6010, 0x12)] pub info_data1: u16,
+    #[entry(0x1A05, 0x6010, 0x13)] pub info_data2: u16,
+    #[entry(0x1A06, 0x6010, 6)]    pub drag_error: i32,
+    #[entry(0x1A0E, 0x6010, 3)]    pub mot_curr_mode: u8,
+
+    #[entry(0x1600, 0x7010, 1)]   pub mot_control: u16,
+    #[entry(0x1601, 0x7010, 6)]   pub target_velo: i32,
+    #[entry(0x1608, 0x7010, 3)]   pub mot_mode: u8,
+    //#[entry(0x1606, 0x7010, 5)]   pub target_pos: u32,
+    //#[entry(0x1606, 0x7010, 0xA)] pub torq_offset: i16,
+    //#[entry(0x1606, 0x7010, 0xB)] pub torq_limit: u16,
+    //#[entry(0x1606, 0x7010, 0xE)] pub comm_angle: u16,
+}
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
+#[pdos(3, Input,  0x1A00, 0x1A01, 0x1A02, 0x1A04, 0x1A05, 0x1A06, 0x1A07, 0x1A0E)]
+#[pdos(2, Output, 0x1600, 0x1601, 0x1608)]
+pub struct EL7221_9014_Velocity {
+    #[entry(0x1A00, 0x6000, 0x11)] pub act_pos: u32,
+    #[entry(0x1A01, 0x6010, 1)]    pub mot_status: u16,
+    #[entry(0x1A02, 0x6010, 7)]    pub act_velo: i32,
+    #[entry(0x1A04, 0x6010, 0x12)] pub info_data1: u16,
+    #[entry(0x1A05, 0x6010, 0x13)] pub info_data2: u16,
+    #[entry(0x1A06, 0x6010, 6)]    pub drag_error: i32,
+    #[entry(0x1A07, 0x6010, 8)]    pub act_torq: i16,
+    #[entry(0x1A0E, 0x6010, 3)]    pub mot_curr_mode: u8,
+
+    #[entry(0x1600, 0x7010, 1)]   pub mot_control: u16,
+    #[entry(0x1601, 0x7010, 6)]   pub target_velo: i32,
+    #[entry(0x1608, 0x7010, 3)]   pub mot_mode: u8,
+    //#[entry(0x1606, 0x7010, 5)]   pub target_pos: u32,
+    //#[entry(0x1606, 0x7010, 0xA)] pub torq_offset: i16,
+    //#[entry(0x1606, 0x7010, 0xB)] pub torq_limit: u16,
+    //#[entry(0x1606, 0x7010, 0xE)] pub comm_angle: u16,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
+pub struct EL9505 {
+}
