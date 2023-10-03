@@ -1,13 +1,16 @@
-// Part of ethercat-rs. Copyright 2018-2019 by the authors.
+// Part of ethercat-rs. Copyright 2018-2023 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
 
-use ethercat::*;
 use ethercat_derive::SlaveProcessImage;
 use crate::image::ProcessImage;
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
 pub struct EK1100 {}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
+pub struct EK1110 {}
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
@@ -48,6 +51,7 @@ pub struct EL1502 {
 #[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A02)]
 #[pdos(2, Output, 0x1602)]
+#[allow(non_camel_case_types)]
 pub struct EL1502_UpDown {
     #[entry(0x1A02, 0x6020, 1)]  pub status: u16,
     #[entry(0x1A02, 0x6020, 17)] pub value: u32,
@@ -86,6 +90,12 @@ pub struct EL2535 {
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
 pub struct EL2612 {
+    #[entry(0x7000, 1)]  pub output: u8,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
+pub struct EL2622 {
     #[entry(0x7000, 1)]  pub output: u8,
 }
 
@@ -164,6 +174,7 @@ pub struct EL5072 {
 #[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A01, 0x1A03, 0x1A04, 0x1A08)]
 #[pdos(2, Output, 0x1601, 0x1602, 0x1604)]
+#[allow(non_camel_case_types)]
 pub struct EL7031_Velocity {
     #[entry(0x1A01, 0x6000, 1)]  pub enc_status: u16,
     #[entry(0x1A01, 0x6000, 0x11)] pub enc_counter: u32,
@@ -183,6 +194,7 @@ pub struct EL7031_Velocity {
 #[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A01, 0x1A03, 0x1A04, 0x1A07)]
 #[pdos(2, Output, 0x1601, 0x1602, 0x1604)]
+#[allow(non_camel_case_types)]
 pub struct EL7041_Velocity {
     #[entry(0x1A01, 0x6000, 1)]  pub enc_status: u16,
     #[entry(0x1A01, 0x6000, 0x11)] pub enc_counter: u32,
@@ -202,6 +214,7 @@ pub struct EL7041_Velocity {
 #[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A01, 0x1A03, 0x1A04, 0x1A08)]
 #[pdos(2, Output, 0x1601, 0x1602, 0x1604)]
+#[allow(non_camel_case_types)]
 pub struct EL7047_Velocity {
     #[entry(0x1A01, 0x6000, 1)]  pub enc_status: u16,
     #[entry(0x1A01, 0x6000, 0x11)] pub enc_counter: u32,
@@ -221,6 +234,7 @@ pub struct EL7047_Velocity {
 #[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A01, 0x1A03, 0x1A04, 0x1A08)]
 #[pdos(2, Output, 0x1601, 0x1602, 0x1603)]
+#[allow(non_camel_case_types)]
 pub struct EL7047_Position {
     #[entry(0x1A01, 0x6000, 1)]  pub enc_status: u16,
     #[entry(0x1A01, 0x6000, 11)] pub enc_counter: u32,
@@ -240,6 +254,7 @@ pub struct EL7047_Position {
 #[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A01, 0x1A03, 0x1A07)]
 #[pdos(2, Output, 0x1601, 0x1602, 0x1606)]
+#[allow(non_camel_case_types)]
 pub struct EL7047_Positioning {
     #[entry(0x1A01, 0x6000, 1)]  pub enc_status: u16,
     #[entry(0x1A01, 0x6000, 11)] pub enc_counter: u32,
@@ -265,6 +280,7 @@ pub struct EL7047_Positioning {
 #[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A00, 0x1A01, 0x1A02, 0x1A03, 0x1A04, 0x1A05, 0x1A06, 0x1A0E)]
 #[pdos(2, Output, 0x1600, 0x1601, 0x1608)]
+#[allow(non_camel_case_types)]
 pub struct EL7211_0010_Velocity {
     #[entry(0x1A00, 0x6000, 0x11)] pub act_pos: u32,
     #[entry(0x1A01, 0x6010, 1)]    pub mot_status: u16,
@@ -287,6 +303,7 @@ pub struct EL7211_0010_Velocity {
 #[derive(SlaveProcessImage, Default)]
 #[pdos(3, Input,  0x1A00, 0x1A01, 0x1A02, 0x1A04, 0x1A05, 0x1A06, 0x1A07, 0x1A0E)]
 #[pdos(2, Output, 0x1600, 0x1601, 0x1608)]
+#[allow(non_camel_case_types)]
 pub struct EL7221_9014_Velocity {
     #[entry(0x1A00, 0x6000, 0x11)] pub act_pos: u32,
     #[entry(0x1A01, 0x6010, 1)]    pub mot_status: u16,
