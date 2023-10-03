@@ -1,4 +1,4 @@
-// Part of ethercat-rs. Copyright 2018-2019 by the authors.
+// Part of ethercat-rs. Copyright 2018-2023 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
 
 //! Support for deriving ethercat-plc traits for a struct.
@@ -12,7 +12,7 @@ use quote::quote;
 use quote::ToTokens;
 
 
-#[proc_macro_derive(SlaveProcessImage, attributes(pdos, entry))]
+#[proc_macro_derive(SlaveProcessImage, attributes(pdos, entry, no_arrays))]
 pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::DeriveInput);
     let ident = input.ident;
@@ -81,6 +81,7 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
         panic!("SlaveProcessImage must be a struct with named fields");
     }
 
+    let mut no_arrays = false;
     for attr in &input.attrs {
         if attr.path.is_ident("pdos") {
             if let syn::Meta::List(syn::MetaList { nested, .. }) =
@@ -94,7 +95,7 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                     let entries = &pdo_mapping.get(&pdo_str).map_or(&[][..], |v| v);
                     pdos.push(quote! {
                         ethercat::PdoCfg {
-                            idx: PdoIdx::from(#pdo_index),
+                            idx: ethercat::PdoIdx::from(#pdo_index),
                             entries: vec![#( #entries ),*]
                         }
                     })
@@ -102,7 +103,7 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                 sync_infos.push(quote! {
                     (
                         ethercat::SmCfg {
-                            idx: SmIdx::from(#sm),
+                            idx: ethercat::SmIdx::from(#sm),
                             direction: ethercat::SyncDirection::#sd,
                             watchdog_mode: ethercat::WatchdogMode::Default,
                         },
@@ -110,6 +111,8 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                     )
                 });
             }
+        } else if attr.path.is_ident("no_arrays") {
+            no_arrays = true;
         }
     }
 
@@ -119,42 +122,48 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
         quote!(Some(vec![#( #sync_infos ),*]))
     };
 
-    let generated = quote! {
+    let mut generated = quote! {
         #[automatically_derived]
         impl ProcessImage for #ident {
             const SLAVE_COUNT: usize = 1;
-            fn get_slave_ids() -> Vec<SlaveId> { vec![#slave_id] }
-            fn get_slave_pdos() -> Vec<Option<Vec<(SmCfg, Vec<PdoCfg>)>>> {
+            fn get_slave_ids() -> Vec<ethercat::SlaveId> { vec![#slave_id] }
+            fn get_slave_pdos() -> Vec<Option<Vec<(ethercat::SmCfg, Vec<ethercat::PdoCfg>)>>> {
                 vec![#sync_infos]
             }
-            fn get_slave_regs() -> Vec<Vec<(PdoEntryIdx, Offset)>> {
+            fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIdx, ethercat::Offset)>> {
                 vec![vec![ #( #pdo_regs ),* ]]
             }
         }
-
-        macro_rules! impl_it {
-            ($n:literal) => {
-                impl ProcessImage for [#ident; $n] {
-                    const SLAVE_COUNT: usize = $n;
-                    fn get_slave_ids() -> Vec<SlaveId> { vec![#slave_id; $n] }
-                    fn get_slave_pdos() -> Vec<Option<Vec<(SmCfg, Vec<PdoCfg>)>>> {
-                        vec![#sync_infos; $n]
-                    }
-                    fn get_slave_regs() -> Vec<Vec<(PdoEntryIdx, Offset)>> {
-                        vec![vec![ #( #pdo_regs ),* ]; $n]
-                    }
-                }
-            };
-        }
-
-        impl_it!(2);
-        impl_it!(3);
-        impl_it!(4);
-        impl_it!(5);
-        impl_it!(6);
-        impl_it!(7);
-        impl_it!(8);
     };
+
+    if !no_arrays {
+        generated = quote! {
+            #generated
+
+            macro_rules! impl_it {
+                ($n:literal) => {
+                    impl ProcessImage for [#ident; $n] {
+                        const SLAVE_COUNT: usize = $n;
+                        fn get_slave_ids() -> Vec<ethercat::SlaveId> { vec![#slave_id; $n] }
+                        fn get_slave_pdos() -> Vec<Option<Vec<(ethercat::SmCfg, Vec<ethercat::PdoCfg>)>>> {
+                            vec![#sync_infos; $n]
+                        }
+                        fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIdx, ethercat::Offset)>> {
+                            vec![vec![ #( #pdo_regs ),* ]; $n]
+                        }
+                    }
+                };
+            }
+
+            impl_it!(2);
+            impl_it!(3);
+            impl_it!(4);
+            impl_it!(5);
+            impl_it!(6);
+            impl_it!(7);
+            impl_it!(8);
+        };
+    }
 
     // println!("{}", generated);
     generated.into()
