@@ -120,6 +120,15 @@ pub struct EL3104 {
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
+pub struct EL3152 {
+    #[entry(0x6000, 1)]  pub ch1_status: u16,
+    #[entry(0x6000, 17)] pub ch1: i16,
+    #[entry(0x6010, 1)]  pub ch2_status: u16,
+    #[entry(0x6010, 17)] pub ch2: i16,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
 pub struct EL4132 {
     #[entry(0x3001, 1)]  pub ch1: i16,
     #[entry(0x3002, 1)]  pub ch2: i16,
