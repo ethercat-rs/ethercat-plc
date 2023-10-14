@@ -16,7 +16,6 @@ path = "src/io_demo.rs"
 
 [dependencies]
 byteorder = "1.3"
-time = "0.1.42"
 ethercat = "0.3.0"
 ethercat-plc = { path = "ethercat-plc" }
 ethercat-derive = { path = "ethercat-derive" }

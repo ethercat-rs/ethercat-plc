@@ -4,8 +4,7 @@
 //! Wrap an EtherCAT master and slave configuration and provide a PLC-like
 //! environment for cyclic task execution.
 
-use std::{thread, time::Duration, marker::PhantomData};
-use time::precise_time_ns;
+use std::{thread, time::{Instant, Duration}, marker::PhantomData};
 use crossbeam_channel::{unbounded, Sender, Receiver};
 use log::*;
 
@@ -54,7 +53,10 @@ impl PlcBuilder {
     }
 
     pub fn build_simulator<E: ExternImage, S: Server>(self) -> Result<PlcSimulator<E, S>> {
-        mlzlog::init(self.logfile_base, &self.name, false, self.debug_logging, true)?;
+        mlzlog::init(self.logfile_base, &self.name,
+                     mlzlog::Settings { show_appname: false,
+                                        debug: self.debug_logging,
+                                        ..Default::default() })?;
 
         let channels = if let Some(addr) = self.server_addr {
             let (w_from_plc, r_from_plc) = unbounded();
@@ -73,7 +75,10 @@ impl PlcBuilder {
     }
 
     pub fn build<P: ProcessImage, E: ExternImage, PC: ProcessConfig, S: Server>(self, cfg: PC) -> Result<Plc<P, E, S>> {
-        mlzlog::init(self.logfile_base, &self.name, false, self.debug_logging, true)?;
+        mlzlog::init(self.logfile_base, &self.name,
+                     mlzlog::Settings { show_appname: false,
+                                        debug: self.debug_logging,
+                                        ..Default::default() })?;
 
         let channels = if let Some(addr) = self.server_addr {
             let (w_from_plc, r_from_plc) = unbounded();
@@ -213,7 +218,7 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
     where F: FnMut(&mut P, &mut E)
     {
         let mut ext = E::default();
-        let mut cycle_start = precise_time_ns();
+        let mut cycle_start = Instant::now();
 
         loop {
             // process data exchange + logic
@@ -228,10 +233,10 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
             }
 
             // wait until next cycle
-            let now = precise_time_ns();
-            cycle_start += self.sleep;
+            let now = Instant::now();
+            cycle_start += Duration::from_nanos(self.sleep);
             if cycle_start > now {
-                thread::sleep(Duration::from_nanos(cycle_start - now));
+                thread::sleep(cycle_start - now);
             }
         }
     }
@@ -268,7 +273,7 @@ impl<E: ExternImage, S: Server> PlcSimulator<E, S> {
     where F: FnMut(&mut E)
     {
         let mut ext = E::default();
-        let mut cycle_start = precise_time_ns();
+        let mut cycle_start = Instant::now();
 
         loop {
             // simulate a cycle
@@ -280,10 +285,10 @@ impl<E: ExternImage, S: Server> PlcSimulator<E, S> {
             }
 
             // wait until next cycle
-            let now = precise_time_ns();
-            cycle_start += self.sleep;
+            let now = Instant::now();
+            cycle_start += Duration::from_nanos(self.sleep);
             if cycle_start > now {
-                thread::sleep(Duration::from_nanos(cycle_start - now));
+                thread::sleep(cycle_start - now);
             }
         }
     }
