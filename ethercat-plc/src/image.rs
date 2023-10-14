@@ -1,4 +1,4 @@
-// Part of ethercat-rs. Copyright 2018-2019 by the authors.
+// Part of ethercat-rs. Copyright 2018-2023 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
 
 //! Tools to create a typesafe process image matching with possible slave PDOs.
@@ -18,7 +18,7 @@ pub trait ProcessImage {
     }
 
     fn cast(data: &mut [u8]) -> &mut Self where Self: Sized {
-        unsafe { std::mem::transmute(data.as_mut_ptr()) }
+        unsafe { &mut *data.as_mut_ptr().cast() }
     }
 }
 

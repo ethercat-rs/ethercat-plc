@@ -1,4 +1,4 @@
-// Part of ethercat-rs. Copyright 2018-2019 by the authors.
+// Part of ethercat-rs. Copyright 2018-2023 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
 
 use ethercat_plc::{PlcBuilder, ProcessImage, ExternImage, TcpServer, ModbusHandler};
@@ -265,6 +265,6 @@ fn main() {
         // let info2 = data.motor.info_data2;
         // println!("st = {:#x}, id = {:#x}, {:#x}", data.motor.mot_status & 0xfff,
                  // info1, info2);
-        println!("pos = {}", data.motor.mot_position & !0);
+        println!("pos = {}", data.motor.mot_position + 0);
     });
 }

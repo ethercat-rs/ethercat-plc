@@ -1,4 +1,4 @@
-// Part of ethercat-rs. Copyright 2018-2019 by the authors.
+// Part of ethercat-rs. Copyright 2018-2023 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
 
 use byteorder::{ByteOrder, NativeEndian as NE};
@@ -42,7 +42,7 @@ pub fn copy_string(dst: &mut [u16], src: &str) {
     } else {
         src
     };
-    NE::read_u16_into(&src[..nbytes].as_bytes(), &mut dst[..nbytes/2])
+    NE::read_u16_into(src[..nbytes].as_bytes(), &mut dst[..nbytes/2])
 }
 
 pub fn copy_float(dst: &mut [u16], f: f32) {

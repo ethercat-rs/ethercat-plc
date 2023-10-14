@@ -1,4 +1,4 @@
-// Part of ethercat-rs. Copyright 2018-2019 by the authors.
+// Part of ethercat-rs. Copyright 2018-2023 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
 
 //! Wrap an EtherCAT master and slave configuration and provide a PLC-like
@@ -7,7 +7,6 @@
 use std::{thread, time::Duration, marker::PhantomData};
 use time::precise_time_ns;
 use crossbeam_channel::{unbounded, Sender, Receiver};
-use mlzlog;
 use log::*;
 
 use ethercat::*;
@@ -68,7 +67,7 @@ impl PlcBuilder {
 
         Ok(PlcSimulator {
             server_channel: channels,
-            sleep: 1000_000_000 / self.cycle_freq.unwrap_or(1000) as u64,
+            sleep: 1_000_000_000 / self.cycle_freq.unwrap_or(1000) as u64,
             _types: PhantomData,
         })
     }
@@ -132,7 +131,6 @@ impl PlcBuilder {
             }
 
             let cfg_index = config.index();
-            drop(config);
 
             // ensure that the slave is actually present
             if master.get_config_info(cfg_index)?.slave_position.is_none() {
@@ -151,10 +149,10 @@ impl PlcBuilder {
         info!("PLC: EtherCAT master activated");
 
         Ok(Plc {
-            master: master,
-            domain: domain,
+            master,
+            domain,
             server_channel: channels,
-            sleep: 1000_000_000 / self.cycle_freq.unwrap_or(1000) as u64,
+            sleep: 1_000_000_000 / self.cycle_freq.unwrap_or(1000) as u64,
             _types: PhantomData,
         })
     }
@@ -174,7 +172,7 @@ pub fn data_exchange<E: ExternImage, X: std::fmt::Debug>(chan: &mut ServerChanne
             let to = from + req.count;
             if let Some(ref mut values) = req.write {
                 // write request
-                data[from..to].copy_from_slice(&values);
+                data[from..to].copy_from_slice(values);
                 let values = req.write.take().unwrap();
                 // let a PLC cycle run after a write request
                 done = true;

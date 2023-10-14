@@ -1,4 +1,4 @@
-// Part of ethercat-rs. Copyright 2018-2019 by the authors.
+// Part of ethercat-rs. Copyright 2018-2023 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
 
 //! Modbus server allowing access to the PLC "memory" variables.
@@ -214,7 +214,7 @@ impl Handler for ModbusHandler {
                 }
                 break;
             }
-            if &headbuf[2..4] != &[0, 0] {
+            if headbuf[2..4] != [0, 0] {
                 warn!("protocol ID mismatch: {:?}", headbuf);
                 break;
             }

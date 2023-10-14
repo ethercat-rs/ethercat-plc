@@ -1,5 +1,7 @@
-// Part of ethercat-rs. Copyright 2018-2019 by the authors.
+// Part of ethercat-rs. Copyright 2018-2023 by the authors.
 // This work is dual-licensed under Apache 2.0 and MIT terms.
+
+#![allow(clippy::type_complexity)]
 
 mod plc;
 mod image;

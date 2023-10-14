@@ -90,7 +90,7 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                 let mut pdos = vec![];
                 for pdo_index in nested.iter().skip(2) {
                     let pdo_str = quote!(#pdo_index).to_string();
-                    let entries = &pdo_mapping.get(&pdo_str).map_or(&[][..], |v| &*v);
+                    let entries = &pdo_mapping.get(&pdo_str).map_or(&[][..], |v| v);
                     pdos.push(quote! {
                         ethercat::PdoCfg {
                             idx: PdoIdx::from(#pdo_index),
