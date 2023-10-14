@@ -1,6 +1,7 @@
 [package]
 name = "ethercat-plc"
 description = "Tools to build a PLC like program using the ethercat crate"
+readme = "../README.md"
 keywords = ["ethercat", "plc", "automation"]
 version = "0.2.1"
 authors = ["Georg Brandl <g.brandl@fz-juelich.de>"]
