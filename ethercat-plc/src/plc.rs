@@ -90,18 +90,16 @@ impl PlcBuilder {
 
         debug!("PLC: EtherCAT master opened");
 
-        // XXX
-        // master.sdo_download(1, SdoIndex::new(0x1011, 1), &0x64616F6Cu32)?;
-        // master.sdo_download(2, SdoIndex::new(0x1011, 1), &0x64616F6Cu32)?;
-
         let slave_ids = P::get_slave_ids();
         let slave_pdos = P::get_slave_pdos();
         let slave_regs = P::get_slave_regs();
         let slave_sdos = P::get_slave_sdos(&cfg);
-        for (i, (((id, pdos), regs), sdos)) in slave_ids.into_iter()
+        let slave_wd_dcs = P::get_slave_wd_dc();
+        for (i, ((((id, pdos), regs), sdos), wd_dc)) in slave_ids.into_iter()
                                                         .zip(slave_pdos)
                                                         .zip(slave_regs)
                                                         .zip(slave_sdos)
+                                                        .zip(slave_wd_dcs)
                                                         .enumerate()
         {
             let mut config = master.configure_slave(SlaveAddr::ByPos(i as u16), id)?;
@@ -127,7 +125,15 @@ impl PlcBuilder {
             }
 
             for (sdo_index, data) in sdos {
-                config.add_sdo(sdo_index, &*data)?;
+                config.add_sdo(sdo_index, data)?;
+            }
+
+            if let Some((div, int)) = wd_dc.0 {
+                config.config_watchdog(div, int)?;
+            }
+
+            if let Some((act, cyc0, sh0, cyc1, sh1)) = wd_dc.1 {
+                config.config_dc(act, cyc0, sh0, cyc1, sh1)?;
             }
 
             let cfg_index = config.index();

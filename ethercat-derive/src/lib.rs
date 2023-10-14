@@ -12,7 +12,7 @@ use quote::quote;
 use quote::ToTokens;
 
 
-#[proc_macro_derive(SlaveProcessImage, attributes(pdos, entry, no_arrays))]
+#[proc_macro_derive(SlaveProcessImage, attributes(pdos, watchdog, dc, entry, no_arrays))]
 pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as syn::DeriveInput);
     let ident = input.ident;
@@ -29,6 +29,8 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
     };
 
     let mut sync_infos = vec![];
+    let mut wd_config = quote!(None);
+    let mut dc_config = quote!(None);
     let mut pdo_regs = vec![];
     let mut running_size = 0usize;
     let mut pdo_mapping = std::collections::HashMap::new();
@@ -83,7 +85,9 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
 
     let mut no_arrays = false;
     for attr in &input.attrs {
-        if attr.path.is_ident("pdos") {
+        if attr.path.is_ident("no_arrays") {
+            no_arrays = true;
+        } else if attr.path.is_ident("pdos") {
             if let syn::Meta::List(syn::MetaList { nested, .. }) =
                 attr.parse_meta().unwrap()
             {
@@ -111,8 +115,25 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                     )
                 });
             }
-        } else if attr.path.is_ident("no_arrays") {
-            no_arrays = true;
+        } else if attr.path.is_ident("watchdog") {
+            if let syn::Meta::List(syn::MetaList { nested, .. }) =
+                attr.parse_meta().unwrap()
+            {
+                let a = &nested[0];
+                let b = &nested[1];
+                wd_config = quote!( Some((#a, #b)) );
+            }
+        } else if attr.path.is_ident("dc") {
+            if let syn::Meta::List(syn::MetaList { nested, .. }) =
+                attr.parse_meta().unwrap()
+            {
+                let a = &nested[0];
+                let b = &nested[1];
+                let c = &nested[2];
+                let d = &nested[3];
+                let e = &nested[4];
+                dc_config = quote!( Some((#a, #b, #c, #d, #e)) );
+            }
         }
     }
 
@@ -133,6 +154,9 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
             fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIdx, ethercat::Offset)>> {
                 vec![vec![ #( #pdo_regs ),* ]]
             }
+            fn get_slave_wd_dc() -> Vec<(Option<(u16, u16)>, Option<(u16, u32, i32, u32, i32)>)> {
+                vec![(#wd_config, #dc_config)]
+            }
         }
     };
 
@@ -150,6 +174,9 @@ pub fn derive_single_process_image(input: TokenStream) -> TokenStream {
                         }
                         fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIdx, ethercat::Offset)>> {
                             vec![vec![ #( #pdo_regs ),* ]; $n]
+                        }
+                        fn get_slave_wd_dc() -> Vec<(Option<(u16, u16)>, Option<(u16, u32, i32, u32, i32)>)> {
+                            vec![(#wd_config, #dc_config); $n]
                         }
                     }
                 };
@@ -277,6 +304,9 @@ pub fn derive_process_image(input: TokenStream) -> TokenStream {
             }
             fn get_slave_regs() -> Vec<Vec<(ethercat::PdoEntryIdx, ethercat::Offset)>> {
                 let mut res = vec![]; #( res.extend(<#slave_tys>::get_slave_regs()); )* res
+            }
+            fn get_slave_wd_dc() -> Vec<(Option<(u16, u16)>, Option<(u16, u32, i32, u32, i32)>)> {
+                let mut res = vec![]; #( res.extend(<#slave_tys>::get_slave_wd_dc()); )* res
             }
             fn get_slave_sdos<C: ethercat_plc::ProcessConfig>(cfg: &C) ->
                 Vec<Vec<(ethercat::SdoIdx, &dyn ethercat::SdoData)>>

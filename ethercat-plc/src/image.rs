@@ -12,6 +12,9 @@ pub trait ProcessImage {
     fn get_slave_pdos() -> Vec<Option<Vec<(SmCfg, Vec<PdoCfg>)>>> { vec![None] }
     fn get_slave_regs() -> Vec<Vec<(PdoEntryIdx, Offset)>> { vec![vec![]] }
     fn get_slave_sdos<C: ProcessConfig>(_: &C) -> Vec<Vec<(SdoIdx, &dyn SdoData)>> { vec![vec![]] }
+    fn get_slave_wd_dc() -> Vec<(Option<(u16, u16)>, Option<(u16, u32, i32, u32, i32)>)> {
+        vec![(None, None)]
+    }
 
     fn size() -> usize where Self: Sized {
         std::mem::size_of::<Self>()
