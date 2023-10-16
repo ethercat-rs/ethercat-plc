@@ -5,10 +5,10 @@
 //! environment for cyclic task execution.
 
 use std::{thread, time::{Instant, Duration}, marker::PhantomData};
+use anyhow::{bail, Context};
 use crossbeam_channel::{unbounded, Sender, Receiver};
 use log::*;
-
-use ethercat::*;
+use ethercat as ec;
 
 use crate::image::{ProcessImage, ExternImage, ProcessConfig};
 use crate::server::{Server, Request, Response};
@@ -52,16 +52,18 @@ impl PlcBuilder {
         self
     }
 
-    pub fn build_simulator<E: ExternImage, S: Server>(self) -> Result<PlcSimulator<E, S>> {
+    pub fn build_simulator<E: ExternImage, S: Server>(self) -> anyhow::Result<PlcSimulator<E, S>> {
         mlzlog::init(self.logfile_base, &self.name,
                      mlzlog::Settings { show_appname: false,
                                         debug: self.debug_logging,
-                                        ..Default::default() })?;
+                                        ..Default::default() })
+            .context("setting up logging")?;
 
         let channels = if let Some(addr) = self.server_addr {
             let (w_from_plc, r_from_plc) = unbounded();
             let (w_to_plc, r_to_plc) = unbounded();
-            S::start(&addr, w_to_plc, r_from_plc)?;
+            S::start(&addr, w_to_plc, r_from_plc)
+                .context("starting external server")?;
             Some((r_to_plc, w_from_plc))
         } else {
             None
@@ -74,24 +76,30 @@ impl PlcBuilder {
         })
     }
 
-    pub fn build<P: ProcessImage, E: ExternImage, PC: ProcessConfig, S: Server>(self, cfg: PC) -> Result<Plc<P, E, S>> {
+    pub fn build<P: ProcessImage, E: ExternImage, PC: ProcessConfig,
+                 S: Server>(self, cfg: PC) -> anyhow::Result<Plc<P, E, S>> {
         mlzlog::init(self.logfile_base, &self.name,
                      mlzlog::Settings { show_appname: false,
                                         debug: self.debug_logging,
-                                        ..Default::default() })?;
+                                        ..Default::default() })
+            .context("setting up logging")?;
 
         let channels = if let Some(addr) = self.server_addr {
             let (w_from_plc, r_from_plc) = unbounded();
             let (w_to_plc, r_to_plc) = unbounded();
-            S::start(&addr, w_to_plc, r_from_plc)?;
+            S::start(&addr, w_to_plc, r_from_plc)
+                .context("starting external server")?;
             Some((r_to_plc, w_from_plc))
         } else {
             None
         };
 
-        let mut master = Master::open(self.master_id.unwrap_or(0), MasterAccess::ReadWrite)?;
+        let mut master = ec::Master::open(self.master_id.unwrap_or(0),
+                                          ec::MasterAccess::ReadWrite)
+            .context("opening Ethercat master")?;
         master.reserve()?;
-        let domain = master.create_domain()?;
+        let domain = master.create_domain()
+            .context("creating Ethercat domain")?;
 
         debug!("PLC: EtherCAT master opened");
 
@@ -107,45 +115,52 @@ impl PlcBuilder {
                                                         .zip(slave_wd_dcs)
                                                         .enumerate()
         {
-            let mut config = master.configure_slave(SlaveAddr::ByPos(i as u16), id)?;
+            let mut config = master.configure_slave(ec::SlaveAddr::ByPos(i as u16), id)
+                                   .with_context(|| format!("configuring slave {} with id {:?}", i, id))?;
             if let Some(sm_pdos) = pdos {
                 for (sm, pdos) in sm_pdos {
-                    config.config_sm_pdos(sm, &pdos)?;
+                    config.config_sm_pdos(sm, &pdos)
+                          .with_context(|| format!("configuring slave {} with pdos for sync \
+                                                    manager {:?}", i, sm))?;
                 }
             }
             let mut first_byte = 0;
             for (j, (entry, mut expected_position)) in regs.into_iter().enumerate() {
-                let pos = config.register_pdo_entry(entry, domain)?;
+                let pos = config.register_pdo_entry(entry, domain)
+                                .with_context(|| format!("registering slave {} pdo {:?}", i, entry))?;
                 if j == 0 {
                     if pos.bit != 0 {
-                        panic!("first PDO of slave {} not byte-aligned", i);
+                        bail!("first PDO of slave {} not byte-aligned", i);
                     }
                     first_byte = pos.byte;
                 } else {
                     expected_position.byte += first_byte;
                     if pos != expected_position {
-                        panic!("slave {} pdo {}: {:?} != {:?}", i, j, pos, expected_position);
+                        bail!("slave {} pdo {}: {:?} != {:?}", i, j, pos, expected_position);
                     }
                 }
             }
 
             for (sdo_index, data) in sdos {
-                config.add_sdo(sdo_index, data)?;
+                config.add_sdo(sdo_index, data)
+                      .with_context(|| format!("adding slave {} sdo {:?}", i, sdo_index))?;
             }
 
             if let Some((div, int)) = wd_dc.0 {
-                config.config_watchdog(div, int)?;
+                config.config_watchdog(div, int)
+                      .with_context(|| format!("configuring slave {} watchdog", i))?;
             }
 
             if let Some((act, cyc0, sh0, cyc1, sh1)) = wd_dc.1 {
-                config.config_dc(act, cyc0, sh0, cyc1, sh1)?;
+                config.config_dc(act, cyc0, sh0, cyc1, sh1)
+                      .with_context(|| format!("configuring slave {} dist. clock", i))?;
             }
 
             let cfg_index = config.index();
 
             // ensure that the slave is actually present
             if master.get_config_info(cfg_index)?.slave_position.is_none() {
-                panic!("slave {} does not match config", i);
+                bail!("slave {} does not match config", i);
             }
         }
 
@@ -153,11 +168,13 @@ impl PlcBuilder {
 
         let domain_size = master.domain(domain).size()?;
         if domain_size != P::size() {
-            panic!("size: {} != {}", domain_size, P::size());
+            bail!("domain size mismatch: real {} != assumed {}", domain_size, P::size());
         }
 
-        master.set_application_time(1)?;  // 0 is not good
-        master.activate()?;
+        master.set_application_time(1)
+            .context("setting application time")?;  // 0 is not good
+        master.activate()
+            .context("activating master")?;
         info!("PLC: EtherCAT master activated");
 
         Ok(Plc {
@@ -206,8 +223,8 @@ pub fn data_exchange<E: ExternImage, X: std::fmt::Debug>(chan: &mut ServerChanne
 
 
 pub struct Plc<P, E, S: Server> {
-    master: Master,
-    domain: DomainIdx,
+    master: ec::Master,
+    domain: ec::DomainIdx,
     sleep:  u64,
     server_channel: Option<ServerChannels<S::Extra>>,
     _types: PhantomData<(P, E)>,
@@ -241,11 +258,13 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
         }
     }
 
-    fn single_cycle<F>(&mut self, mut cycle_fn: F, ext: &mut E) -> Result<()>
+    fn single_cycle<F>(&mut self, mut cycle_fn: F, ext: &mut E) -> anyhow::Result<()>
     where F: FnMut(&mut P, &mut E)
     {
-        self.master.receive()?;
-        self.master.domain(self.domain).process()?;
+        self.master.receive()
+            .context("receiving Ethercat data")?;
+        self.master.domain(self.domain).process()
+            .context("processing domain data")?;
 
         // XXX: check working counters periodically, etc.
         // println!("master state: {:?}", self.master.state());
@@ -254,8 +273,10 @@ impl<P: ProcessImage, E: ExternImage, S: Server> Plc<P, E, S> {
         let data = P::cast(self.master.domain_data(self.domain)?);
         cycle_fn(data, ext);
 
-        self.master.domain(self.domain).queue()?;
-        self.master.send()?;
+        self.master.domain(self.domain).queue()
+            .context("queueing new domain data")?;
+        self.master.send()
+            .context("sending Ethercat data")?;
         Ok(())
     }
 }
