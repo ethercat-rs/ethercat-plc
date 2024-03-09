@@ -304,6 +304,7 @@ impl Handler for SimpleHandler {
 
     fn new(client: TcpStream, hid: usize, requests: Sender<HandlerEvent<bool>>,
            replies: Receiver<Response<bool>>) -> Self {
+        client.set_nodelay(true).unwrap();
         let send_client = client.try_clone().expect("could not clone socket");
         thread::spawn(move || SimpleHandler::sender(send_client, replies));
         SimpleHandler { client, hid, requests }
