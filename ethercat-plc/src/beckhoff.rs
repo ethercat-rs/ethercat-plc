@@ -89,6 +89,79 @@ pub struct EL2535 {
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
+#[pdos(2, Output, 0x1600, 0x1610, 0x1620, 0x1630)]
+#[pdos(3, Input,  0x1A00, 0x1A10, 0x1A20, 0x1A30)]
+pub struct EL2574 {
+    #[entry(0x1A00, 0x6000, 1)]  pub ch1_status: u16,
+    #[entry(0x1A10, 0x6010, 1)]  pub ch2_status: u16,
+    #[entry(0x1A20, 0x6020, 1)]  pub ch3_status: u16,
+    #[entry(0x1A30, 0x6030, 1)]  pub ch4_status: u16,
+
+    #[entry(0x1600, 0x7000, 1)]    pub ch1_control: u8,
+    #[entry(0x1600, 0x7000, 9)]    pub ch1_command: u16,
+    #[entry(0x1600, 0x7000, 0x11)] pub ch1_index: u16,
+    #[entry(0x1600, 0x7000, 0x12)] pub ch1_length: u16,
+    #[entry(0x1600, 0x7000, 0x13)] pub ch1_param: u8,
+    #[entry(0x1600, 0x7000, 0x21)] pub ch1_red: u8,
+    #[entry(0x1600, 0x7000, 0x22)] pub ch1_green: u8,
+    #[entry(0x1600, 0x7000, 0x23)] pub ch1_blue: u8,
+    #[entry(0x1600, 0x7000, 0x24)] pub ch1_white: u8,
+
+    #[entry(0x1600, 0x7010, 1)]    pub ch2_control: u8,
+    #[entry(0x1600, 0x7010, 9)]    pub ch2_command: u16,
+    #[entry(0x1600, 0x7010, 0x11)] pub ch2_index: u16,
+    #[entry(0x1600, 0x7010, 0x12)] pub ch2_length: u16,
+    #[entry(0x1600, 0x7010, 0x13)] pub ch2_param: u8,
+    #[entry(0x1600, 0x7010, 0x21)] pub ch2_red: u8,
+    #[entry(0x1600, 0x7010, 0x22)] pub ch2_green: u8,
+    #[entry(0x1600, 0x7010, 0x23)] pub ch2_blue: u8,
+    #[entry(0x1600, 0x7010, 0x24)] pub ch2_white: u8,
+
+    #[entry(0x1600, 0x7020, 1)]    pub ch3_control: u8,
+    #[entry(0x1600, 0x7020, 9)]    pub ch3_command: u16,
+    #[entry(0x1600, 0x7020, 0x11)] pub ch3_index: u16,
+    #[entry(0x1600, 0x7020, 0x12)] pub ch3_length: u16,
+    #[entry(0x1600, 0x7020, 0x13)] pub ch3_param: u8,
+    #[entry(0x1600, 0x7020, 0x21)] pub ch3_red: u8,
+    #[entry(0x1600, 0x7020, 0x22)] pub ch3_green: u8,
+    #[entry(0x1600, 0x7020, 0x23)] pub ch3_blue: u8,
+    #[entry(0x1600, 0x7020, 0x24)] pub ch3_white: u8,
+
+    #[entry(0x1600, 0x7030, 1)]    pub ch4_control: u8,
+    #[entry(0x1600, 0x7030, 9)]    pub ch4_command: u16,
+    #[entry(0x1600, 0x7030, 0x11)] pub ch4_index: u16,
+    #[entry(0x1600, 0x7030, 0x12)] pub ch4_length: u16,
+    #[entry(0x1600, 0x7030, 0x13)] pub ch4_param: u8,
+    #[entry(0x1600, 0x7030, 0x21)] pub ch4_red: u8,
+    #[entry(0x1600, 0x7030, 0x22)] pub ch4_green: u8,
+    #[entry(0x1600, 0x7030, 0x23)] pub ch4_blue: u8,
+    #[entry(0x1600, 0x7030, 0x24)] pub ch4_white: u8,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
+#[pdos(2, Output, 0x1601)]
+#[pdos(3, Input,  0x1A00)]
+pub struct EL2574_Extended {
+    #[entry(0x1A00, 0x6000, 1)]  pub ch1_status: u16,
+    // #[entry(0x1A10, 0x6010, 1)]  pub ch2_status: u16,
+    // #[entry(0x1A20, 0x6020, 1)]  pub ch3_status: u16,
+    // #[entry(0x1A30, 0x6030, 1)]  pub ch4_status: u16,
+
+    #[entry(0x1601, 0x7001, 1)]    pub ch1_control: u8,
+    #[entry(0x1601, 0x7001, 9)]    pub ch1_index: u8,
+    #[entry(0x1601, 0x7001, 0x11)] pub ch1_el0: u32,
+    #[entry(0x1601, 0x7001, 0x12)] pub ch1_el1: u32,
+    #[entry(0x1601, 0x7001, 0x13)] pub ch1_el2: u32,
+    #[entry(0x1601, 0x7001, 0x14)] pub ch1_el3: u32,
+    #[entry(0x1601, 0x7001, 0x15)] pub ch1_el4: u32,
+    #[entry(0x1601, 0x7001, 0x16)] pub ch1_el5: u32,
+    #[entry(0x1601, 0x7001, 0x17)] pub ch1_el6: u32,
+    #[entry(0x1601, 0x7001, 0x18)] pub ch1_el7: u32,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
 pub struct EL2612 {
     #[entry(0x7000, 1)]  pub output: u8,
 }
