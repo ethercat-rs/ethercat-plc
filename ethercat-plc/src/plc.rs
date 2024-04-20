@@ -117,6 +117,7 @@ impl PlcBuilder {
         {
             let mut config = master.configure_slave(ec::SlaveAddr::ByPos(i as u16), id)
                                    .with_context(|| format!("configuring slave {} with id {:?}", i, id))?;
+
             if let Some(sm_pdos) = pdos {
                 for (sm, pdos) in sm_pdos {
                     config.config_sm_pdos(sm, &pdos)
@@ -141,9 +142,18 @@ impl PlcBuilder {
                 }
             }
 
-            for (sdo_index, data) in sdos {
-                config.add_sdo(sdo_index, data)
-                      .with_context(|| format!("adding slave {} sdo {:?}", i, sdo_index))?;
+            for (sdo_index, complete, data) in sdos {
+                if complete {
+                    config.add_complete_sdo(
+                        sdo_index,
+                        unsafe {
+                            std::slice::from_raw_parts(data.data_ptr(), data.data_size())
+                        })
+                          .with_context(|| format!("adding slave {} complete sdo {:?}", i, sdo_index))?;
+                } else {
+                    config.add_sdo(sdo_index, data)
+                          .with_context(|| format!("adding slave {} sdo {:?}", i, sdo_index))?;
+                }
             }
 
             if let Some((div, int)) = wd_dc.0 {
