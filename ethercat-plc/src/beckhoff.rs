@@ -27,6 +27,12 @@ pub struct EL1008 {
 
 #[repr(C, packed)]
 #[derive(SlaveProcessImage, Default)]
+pub struct EL1034 {
+    #[entry(0x6000, 1)]  pub input: u8,
+}
+
+#[repr(C, packed)]
+#[derive(SlaveProcessImage, Default)]
 pub struct EL1018 {
     #[entry(0x6000, 1)]  pub input: u8,
 }
